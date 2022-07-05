@@ -13,6 +13,10 @@ provider "azurerm" {
   }
 }
 
+variable "my_ip" {
+  type = string
+}
+
 resource "azurerm_resource_group" "mtc-rg" {
   name     = "mtc-resources"
   location = "East Us"
@@ -55,7 +59,7 @@ resource "azurerm_network_security_rule" "mtc-dev-rule" {
   protocol                    = "*"
   source_port_range           = "*"
   destination_port_range      = "*"
-  source_address_prefix       = "71.235.63.100/32"
+  source_address_prefix       = var.my_ip
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.mtc-rg.name
   network_security_group_name = azurerm_network_security_group.mtc-nsg.name
@@ -86,6 +90,36 @@ resource "azurerm_network_interface" "mtc-nic" {
     subnet_id                     = azurerm_subnet.mtc-subnet.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.mtc-ip.id
+  }
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+resource "azurerm_linux_virtual_machine" "mtc-vm" {
+  name                  = "mtc-vm"
+  resource_group_name   = azurerm_resource_group.mtc-rg.name
+  location              = azurerm_resource_group.mtc-rg.location
+  size                  = "Standard_B1s"
+  admin_username        = "adminuser"
+  network_interface_ids = [azurerm_network_interface.mtc-nic.id]
+
+  admin_ssh_key {
+    username   = "adminuser"
+    public_key = file("~/.ssh/mtcazurekey.pub")
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
   }
 
   tags = {
